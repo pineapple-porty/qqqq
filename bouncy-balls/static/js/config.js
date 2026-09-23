@@ -19,5 +19,8 @@ const CONFIG = {
   GHOST_CANDIDATES: 7,      // directions sampled at each wall bounce
   BOOST: 0.45,              // speed boost after a smart re-aim
   BOOST_DECAY: 1.6,         // per-second exponential decay of the boost
-  BOOST_TRAIL: 0.05,        // boost level below which the trail stops drawing
+
+  // Orbs drift around the arena like the hello-wrld reference game.
+  ORB_SPEED: 40,            // green orb drift speed, px/sec
+  ORB_BLUE_SPEED_RATIO: 0.5 // rare blue orbs drift slower
 };

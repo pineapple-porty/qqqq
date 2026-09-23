@@ -36,16 +36,21 @@ const renderer = {
     for (let y = 40; y < H; y += 40){ ctx.moveTo(0, y); ctx.lineTo(W, y); }
     ctx.stroke();
 
-    // Orbs.
+    // Orbs — styled after the hello-wrld reference: green #54b86b with a
+    // #fff7cf border and #b9f29b glow; blue #1874df with #d8f0ff and glow.
     for (const o of pickups.orbs){
       if (o.dead) continue;
+      const R = o.type === 'blue' ? 11 : 9;
       ctx.beginPath();
-      ctx.arc(o.x, o.y, o.type === 'blue' ? 9 : 7, 0, Math.PI * 2);
-      ctx.fillStyle = o.type === 'blue' ? '#3b82f6' : '#4caf50';
-      ctx.shadowColor = ctx.fillStyle;
-      ctx.shadowBlur = o.type === 'blue' ? 14 : 8;
+      ctx.arc(o.x, o.y, R, 0, Math.PI * 2);
+      ctx.fillStyle = o.type === 'blue' ? '#1874df' : '#54b86b';
+      ctx.shadowColor = o.type === 'blue' ? '#3f97ff' : '#b9f29b';
+      ctx.shadowBlur = o.type === 'blue' ? 16 : 12;
       ctx.fill();
       ctx.shadowBlur = 0;
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = o.type === 'blue' ? '#d8f0ff' : '#fff7cf';
+      ctx.stroke();
     }
 
     // Armor pickups (shield shapes).
@@ -69,6 +74,13 @@ const renderer = {
       ctx.fillStyle = 'hsl(' + b.hue + ',70%,' + clamp(45 + f * 15, 30, 70) + '%)';
       ctx.fill();
 
+      if (b.boost > 0.05){
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(255,255,255,' + Math.min(b.boost, 0.5) + ')';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, C.BALL_R + 6, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       if (b.armor > 0){
         ctx.lineWidth = 3;
         ctx.strokeStyle = 'rgba(200,162,74,0.9)';

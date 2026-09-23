@@ -25,6 +25,7 @@
     for (const b of state.balls){
       b.update(dt, renderer.W, renderer.H, state.pickups.orbs);
     }
+    moveOrbs(state.pickups, dt, renderer.W, renderer.H);
     collideBalls(state.balls, state.stats);
     collidePickups(state.balls, state.pickups, state.stats);
     updatePickups(state.pickups, dt, renderer.W, renderer.H);
