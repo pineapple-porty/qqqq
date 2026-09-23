@@ -66,7 +66,7 @@ const renderer = {
       ctx.restore();
     }
 
-    // Balls — guy-style: each carries an hp label.
+    // Balls — guy-style: hp label above, IQ label underneath.
     ctx.textAlign = 'center';
     for (const b of balls){
       const f = speedFactor(b.hp);
@@ -97,7 +97,7 @@ const renderer = {
         ctx.stroke();
       }
 
-      // IQ in the middle, hp label above (like the guys' "hp:123").
+      // hp label above, IQ label below (like the guys' labels).
       ctx.fillStyle = '#0e1220';
       ctx.font = 'bold 10px system-ui';
       ctx.textBaseline = 'middle';
@@ -106,6 +106,7 @@ const renderer = {
       ctx.font = '11px monospace';
       ctx.textBaseline = 'alphabetic';
       ctx.fillText('hp:' + Math.round(b.hp), b.x, b.y - C.BALL_R - 6);
+      ctx.fillText('IQ:' + b.iq, b.x, b.y + C.BALL_R + 14);
     }
   },
 };
