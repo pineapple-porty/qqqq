@@ -14,4 +14,10 @@ const CONFIG = {
   IQ_CHECK_INTERVAL: 2.5,    // seconds between IQ drift checks
   MENU_REFRESH_MS: 250,     // side-menu update throttle
   MAX_DT: 0.05,             // clamp for tab-switch spikes
+
+  // Ghost bounce evaluation
+  GHOST_CANDIDATES: 7,      // directions sampled at each wall bounce
+  BOOST: 0.45,              // speed boost after a smart re-aim
+  BOOST_DECAY: 1.6,         // per-second exponential decay of the boost
+  BOOST_TRAIL: 0.05,        // boost level below which the trail stops drawing
 };
