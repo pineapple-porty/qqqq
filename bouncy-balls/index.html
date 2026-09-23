@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Bouncy Balls — IQ Arena</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; font-family: system-ui, sans-serif; background:#0e1220; color:#e8ecf5; overflow:hidden; }
+  #wrap { display:flex; height:100vh; }
+  #stageWrap { flex:1; position:relative; }
+  canvas { display:block; width:100%; height:100%; cursor:crosshair; }
+  #tooltip {
+    position:fixed; pointer-events:none; display:none;
+    background:#1c2333; border:1px solid #3a4560; border-radius:8px;
+    padding:6px 10px; font-size:13px; z-index:10; white-space:nowrap;
+    box-shadow:0 4px 12px rgba(0,0,0,.4);
+  }
+  #menu {
+    width:270px; flex-shrink:0; background:#141a2b; border-left:1px solid #232c45;
+    padding:16px; overflow-y:auto;
+  }
+  #menu h1 { font-size:17px; margin-bottom:12px; color:#fff; }
+  #menu h2 { font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:#8a94b8; margin:16px 0 6px; }
+  .card { background:#1a2135; border:1px solid #263050; border-radius:10px; padding:10px 12px; margin-bottom:8px; font-size:13px; line-height:1.6; }
+  .stat { display:flex; justify-content:space-between; }
+  .stat b { font-weight:600; }
+  .hpbar { height:6px; background:#0b0f1a; border-radius:3px; margin-top:6px; overflow:hidden; }
+  .hpbar i { display:block; height:100%; border-radius:3px; background:#4caf50; transition:width .25s; }
+  .dim { color:#66708f; font-size:12px; }
+  .legend { font-size:12px; line-height:1.9; }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stageWrap"><canvas id="stage"></canvas></div>
+  <aside id="menu">
+    <h1>🏀 Bouncy Balls — IQ Arena</h1>
+    <h2>Selected / Hovered Ball</h2>
+    <div class="card" id="ballCard"><span class="dim">Click a ball to select it.<br/>Hover to see its IQ.</span></div>
+    <h2>World</h2>
+    <div class="card" id="worldCard"></div>
+    <h2>Legend</h2>
+    <div class="card legend">
+      <span class="dot" style="background:#4caf50"></span>Green orb: +20–30 HP<br>
+      <span class="dot" style="background:#3b82f6"></span>Blue orb (rare): +100–130 HP<br>
+      <span class="dot" style="background:#c8a24a"></span>Armor: negates 30–40% of hit damage<br>
+      <span class="dim">IQ = how many bounces ahead a ball can "see".<br>
+      Slow balls lose IQ (min 1); active balls regain it (max 15).<br>
+      High-speed collisions deal damage. HP drives speed:<br>
+      20–100 HP = normal, −50 HP ≈ stopped.</span>
+    </div>
+  </aside>
+</div>
+<div id="tooltip"></div>
+<script>
+(function(){
+  'use strict';
+  const canvas = document.getElementById('stage');
+  const ctx = canvas.getContext('2d');
+  const tooltip = document.getElementById('tooltip');
+  const ballCard = document.getElementById('ballCard');
+  const worldCard = document.getElementById('worldCard');
+
+  const BASE_SPEED = 95;          // px/sec at "normal" speed
+  const NUM_BALLS = 14;
+  const ORB_COUNT = 6;
+  const ARMOR_COUNT = 3;
+  const BLUE_CHANCE = 0.12;       // blue orbs are uncommon
+  const COLLISION_THRESHOLD = 5;  // relative speed needed to hurt
+  const BALL_R = 12;
+
+  let W = 0, H = 0, DPR = 1;
+  function resize(){
+    const r = canvas.parentElement.getBoundingClientRect();
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = r.width; H = r.height;
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+
+  // HP -> speed factor. 20..100 HP = normal (1x). -50 HP = stopped.
+  function speedFactor(hp){
+    if (hp <= -50) return 0;
+    if (hp < 20)   return (hp + 50) / 70;          // tapers to 0 at -50
+    if (hp <= 100) return 1;
+    return Math.min(1.6, 1 + (hp - 100) / 150);     // a bit faster above 100
+  }
+
+  function bestOrbFor(b){
+    let best = null, bestD = Infinity;
+    for (const o of orbs){
+      if (o.dead) continue;
+      const d = (o.x-b.x)*(o.x-b.x) + (o.y-b.y)*(o.y-b.y)
+              - (o.type==='blue' ? 40000 : 0);     // blue orbs are more attractive
+      if (d < bestD){ bestD = d; best = o; }
+    }
+    return best;
+  }
+
+  class Ball {
+    constructor(id){
+      this.id = id;
+      this.x = rand(60, W-60); this.y = rand(60, H-60);
+      const a = rand(0, Math.PI*2);
+      this.dx = Math.cos(a); this.dy = Math.sin(a);
+      this.hp = rand(30, 80);
+      this.iq = Math.round(rand(9, 15));   // IQ: bounces visible ahead (1..15)
+      this.iqMax = this.iq;
+      this.armor = 0;                        // damage absorption 0 / 0.30..0.40
+      this.hue = rand(0, 360);
+      this.moveAccum = 0; this.iqTimer = rand(0, 3);
+      this.lastSpeed = 0;
+    }
+    speed(){ return BASE_SPEED * speedFactor(this.hp); }
+    steer(dt){
+      // Slight mid-flight course correction; scales with IQ.
+      const orb = bestOrbFor(this);
+      if (!orb) return;
+      const cur = Math.atan2(this.dy, this.dx);
+      const want = Math.atan2(orb.y - this.y, orb.x - this.x);
+      let d = want - cur;
+      while (d > Math.PI) d -= Math.PI*2;
+      while (d < -Math.PI) d += Math.PI*2;
+      const maxTurn = 0.9 * (this.iq / 15) * dt;   // smart balls turn tighter
+      d = clamp(d, -maxTurn, maxTurn);
+      const na = cur + d;
+      this.dx = Math.cos(na); this.dy = Math.sin(na);
+    }
+    bounceWall(nx, ny){
+      // reflect
+      const dot = this.dx*nx + this.dy*ny;
+      this.dx -= 2*dot*nx; this.dy -= 2*dot*ny;
+      // small randomness so paths aren't sterile
+      const jitter = rand(-0.15, 0.15);
+      let a = Math.atan2(this.dy, this.dx) + jitter;
+      // IQ lookahead: foresee up to iq future bounces and aim at the
+      // best orb reachable within that horizon.
+      if (this.iq >= 2){
+        const orb = bestOrbFor(this);
+        if (orb){
+          const want = Math.atan2(orb.y - this.y, orb.x - this.x);
+          let d = want - a;
+          while (d > Math.PI) d -= Math.PI*2;
+          while (d < -Math.PI) d += Math.PI*2;
+          a += d * clamp(this.iq / 15, 0, 1) * 0.5;  // up to ~30 degrees of aim
+        }
+      }
+      this.dx = Math.cos(a); this.dy = Math.sin(a);
+    }
+    update(dt){
+      this.steer(dt);
+      const s = this.speed();
+      const ox = this.x, oy = this.y;
+      this.x += this.dx * s * dt;
+      this.y += this.dy * s * dt;
+      this.moveAccum += Math.hypot(this.x-ox, this.y-oy);
+
+      if (this.x < BALL_R){ this.x = BALL_R; this.bounceWall(1, 0); }
+      else if (this.x > W-BALL_R){ this.x = W-BALL_R; this.bounceWall(-1, 0); }
+      if (this.y < BALL_R){ this.y = BALL_R; this.bounceWall(0, 1); }
+      else if (this.y > H-BALL_R){ this.y = H-BALL_R; this.bounceWall(0, -1); }
+
+      // IQ drift: the slower / less a ball moves, the more IQ it may lose.
+      this.iqTimer += dt;
+      if (this.iqTimer >= 2.5){
+        const avg = this.moveAccum / this.iqTimer; // px per second actually moved
+        this.moveAccum = 0; this.iqTimer = 0;
+        if (avg < BASE_SPEED * 0.45){
+          if (Math.random() < 0.6) this.iq = Math.max(1, this.iq - 1);   // floor: 1
+        } else if (avg > BASE_SPEED * 0.8){
+          if (Math.random() < 0.35) this.iq = Math.min(15, this.iq + 1); // ceiling: 15
+        }
+      }
+    }
+  }
+
+  const orbs = [], armors = [];
+  function spawnOrb(o){
+    o.x = rand(30, W-30); o.y = rand(30, H-30);
+    o.type = Math.random() < BLUE_CHANCE ? 'blue' : 'green';
+    o.dead = false; o.respawn = 0;
+  }
+  function spawnArmor(a){
+    a.x = rand(30, W-30); a.y = rand(30, H-30);
+    a.absorb = rand(0.30, 0.40);
+    a.dead = false; a.respawn = 0;
+  }
+
+  let balls = [];
+  function initWorld(){
+    balls = [];
+    for (let i = 0; i < NUM_BALLS; i++) balls.push(new Ball(i));
+    orbs.length = 0; armors.length = 0;
+    for (let i = 0; i < ORB_COUNT; i++){ const o = {}; spawnOrb(o); orbs.push(o); }
+    for (let i = 0; i < ARMOR_COUNT; i++){ const a = {}; spawnArmor(a); armors.push(a); }
+  }
+
+  let hovered = null, selected = null;
+  let mouse = {x:-999, y:-999};
+  let stats = { green:0, blue:0, armor:0, hits:0 };
+
+  canvas.addEventListener('mousemove', e => {
+    const r = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top;
+    hovered = pick(mouse.x, mouse.y);
+    if (hovered){
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.clientX + 14) + 'px';
+      tooltip.style.top  = (e.clientY + 14) + 'px';
+      tooltip.textContent = 'Ball #' + hovered.id + ' — IQ: ' + hovered.iq;
+    } else tooltip.style.display = 'none';
+  });
+  canvas.addEventListener('mouseleave', () => { hovered = null; tooltip.style.display='none'; });
+  canvas.addEventListener('click', () => { selected = hovered ? hovered : null; refreshMenu(true); });
+
+  function pick(x, y){
+    for (const b of balls){
+      const rr = BALL_R + 8;
+      if ((x-b.x)*(x-b.x) + (y-b.y)*(y-b.y) < rr*rr) return b;
+    }
+    return null;
+  }
+
+  function collide(){
+    // Ball vs ball — only fast collisions hurt.
+    for (let i = 0; i < balls.length; i++){
+      for (let j = i+1; j < balls.length; j++){
+        const a = balls[i], b = balls[j];
+        const dx = b.x-a.x, dy = b.y-a.y;
+        const d2 = dx*dx + dy*dy, min = BALL_R*2;
+        if (d2 >= min*min || d2 === 0) continue;
+        const d = Math.sqrt(d2), nx = dx/d, ny = dy/d;
+        // separate
+        const push = (min - d) / 2;
+        a.x -= nx*push; a.y -= ny*push; b.x += nx*push; b.y += ny*push;
+        // relative speed along the collision normal
+        const sa = a.speed(), sb = b.speed();
+        const avx = a.dx*sa, avy = a.dy*sa, bvx = b.dx*sb, bvy = b.dy*sb;
+        const rel = (avx-bvx)*nx + (avy-bvy)*ny;
+        if (rel > 0) continue; // already separating
+        const impact = -rel / BASE_SPEED;   // in "normal speed" units
+        // swap normal components (equal mass elastic)
+        const ma = (avx*nx + avy*ny), mb = (bvx*nx + bvy*ny);
+        const dxA = nx*(mb-ma), dyA = ny*(mb-ma);
+        const na = Math.hypot(avx+dxA, avy+dyA) || 1;
+        const nb = Math.hypot(bvx-dxA, bvy-dyA) || 1;
+        a.dx = (avx+dxA)/na; a.dy = (avy+dyA)/na;
+        b.dx = (bvx-dxA)/nb; b.dy = (bvy-dyA)/nb;
+        if (impact > COLLISION_THRESHOLD){
+          const dmg = (impact - COLLISION_THRESHOLD) * 9;
+          a.hp -= dmg * (1 - a.armor);
+          b.hp -= dmg * (1 - b.armor);
+          stats.hits++;
+        }
+      }
+    }
+    // Ball vs orbs
+    for (const b of balls){
+      for (const o of orbs){
+        if (o.dead) continue;
+        if ((o.x-b.x)*(o.x-b.x) + (o.y-b.y)*(o.y-b.y) < (BALL_R+8)*(BALL_R+8)){
+          const gain = o.type === 'blue' ? rand(100,130) : rand(20,30);
+          b.hp += gain;
+          stats[o.type === 'blue' ? 'blue' : 'green']++;
+          o.dead = true; o.respawn = rand(4, 9);
+        }
+      }
+      for (const a of armors){
+        if (a.dead) continue;
+        if ((a.x-b.x)*(a.x-b.x) + (a.y-b.y)*(a.y-b.y) < (BALL_R+8)*(BALL_R+8)){
+          if (a.absorb > b.armor) b.armor = a.absorb;
+          stats.armor++;
+          a.dead = true; a.respawn = rand(6, 12);
+        }
+      }
+    }
+  }
+
+  function draw(){
+    ctx.clearRect(0, 0, W, H);
+    // subtle grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 40; x < W; x += 40){ ctx.moveTo(x,0); ctx.lineTo(x,H); }
+    for (let y = 40; y < H; y += 40){ ctx.moveTo(0,y); ctx.lineTo(W,y); }
+    ctx.stroke();
+
+    // orbs
+    for (const o of orbs){
+      if (o.dead) continue;
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, o.type === 'blue' ? 9 : 7, 0, Math.PI*2);
+      ctx.fillStyle = o.type === 'blue' ? '#3b82f6' : '#4caf50';
+      ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = o.type === 'blue' ? 14 : 8;
+      ctx.fill(); ctx.shadowBlur = 0;
+    }
+    // armor pickups (shield shapes)
+    for (const a of armors){
+      if (a.dead) continue;
+      ctx.save();
+      ctx.translate(a.x, a.y);
+      ctx.fillStyle = '#c8a24a';
+      ctx.beginPath();
+      ctx.moveTo(0,-9); ctx.lineTo(8,-4); ctx.lineTo(8,4); ctx.lineTo(0,10);
+      ctx.lineTo(-8,4); ctx.lineTo(-8,-4); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    // balls
+    for (const b of balls){
+      const f = speedFactor(b.hp);
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, BALL_R, 0, Math.PI*2);
+      const light = 45 + f*15;
+      ctx.fillStyle = 'hsl(' + b.hue + ',70%,' + clamp(light,30,70) + '%)';
+      ctx.fill();
+      if (b.armor > 0){
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(200,162,74,0.9)';
+        ctx.beginPath(); ctx.arc(b.x, b.y, BALL_R+4, 0, Math.PI*2); ctx.stroke();
+      }
+      if (b === selected || b === hovered){
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = b === selected ? '#ffffff' : 'rgba(255,255,255,0.6)';
+        ctx.beginPath(); ctx.arc(b.x, b.y, BALL_R+8, 0, Math.PI*2); ctx.stroke();
+        ctx.fillStyle = '#0e1220'; ctx.font = 'bold 10px system-ui';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(b.iq, b.x, b.y);
+      }
+    }
+  }
+
+  let lastMenu = 0;
+  function refreshMenu(force){
+    const now = performance.now();
+    if (!force && now - lastMenu < 250) return;
+    lastMenu = now;
+    const b = selected || hovered;
+    if (b){
+      const f = speedFactor(b.hp);
+      ballCard.innerHTML =
+        '<div class="stat"><span>Ball</span><b>#' + b.id + '</b></div>' +
+        '<div class="stat"><span>IQ (bounces seen ahead)</span><b>' + b.iq + ' / 15</b></div>' +
+        '<div class="stat"><span>HP</span><b>' + b.hp.toFixed(0) + '</b></div>' +
+        '<div class="hpbar"><i style="width:' + clamp((b.hp+50)/180*100,0,100) + '%;background:' +
+        (b.hp < 0 ? '#e5484d' : b.hp < 20 ? '#e8a33d' : '#4caf50') + '"></i></div>' +
+        '<div class="stat"><span>Armor</span><b>' + (b.armor > 0 ? Math.round(b.armor*100) + '% absorb' : 'none') + '</b></div>' +
+        '<div class="stat"><span>Speed</span><b>' + Math.round(f*100) + '%</b></div>';
+    } else if (!force){
+      ballCard.innerHTML = '<span class="dim">Click a ball to select it.<br/>Hover to see its IQ.</span>';
+    }
+    worldCard.innerHTML =
+      '<div class="stat"><span>Balls alive</span><b>' + balls.length + '</b></div>' +
+      '<div class="stat"><span>Green orbs eaten</span><b>' + stats.green + '</b></div>' +
+      '<div class="stat"><span>Blue orbs eaten</span><b>' + stats.blue + '</b></div>' +
+      '<div class="stat"><span>Armor grabbed</span><b>' + stats.armor + '</b></div>' +
+      '<div class="stat"><span>Painful collisions</span><b>' + stats.hits + '</b></div>' +
+      '<div class="stat"><span>Smarter ball</span><b>IQ ' + Math.max.apply(null, balls.map(function(x){return x.iq})) + '</b></div>' +
+      '<div class="stat"><span>Dumbest ball</span><b>IQ ' + Math.min.apply(null, balls.map(function(x){return x.iq})) + '</b></div>';
+  }
+
+  let last = performance.now();
+  function loop(now){
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    for (const b of balls) b.update(dt);
+    collide();
+    // respawns
+    for (const o of orbs){
+      if (o.dead){ o.respawn -= dt; if (o.respawn <= 0) spawnOrb(o); }
+    }
+    for (const a of armors){
+      if (a.dead){ a.respawn -= dt; if (a.respawn <= 0) spawnArmor(a); }
+    }
+    draw();
+    refreshMenu(false);
+    requestAnimationFrame(loop);
+  }
+
+  resize();
+  initWorld();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
