@@ -1,7 +1,7 @@
 // Global tuning knobs for the whole simulation.
 'use strict';
 const CONFIG = {
-  BASE_SPEED: 80,           // px/sec reference point for the guy speed curve
+  PX_PER_UNIT: 60,         // 1.0 reference velocity ~= 60 px/sec (hello-wrld scale)
   BALL_R: 12,               // ball radius, px
   NUM_BALLS: 14,
   ORB_COUNT: 6,
@@ -26,6 +26,6 @@ const CONFIG = {
   // Guy-style hard-hit collisions
   HIT_DAMAGE: 30,           // flat damage per hard hit (like the guys)
   HIT_COOLDOWN_MS: 650,     // per-pair cooldown, like the guys
-  HIT_CLOSING_SPEED: 7.5,   // closing speed in "reference" velocity units
-  REFERENCE_UNIT: 60,       // reference 1.0 velocity ~= 60 px/sec
+  HIT_CLOSING_SPEED: 7.5,   // closing speed in reference velocity units
+  FLING_MAX: 1.6,           // cap on fling velocity, reference units
 };

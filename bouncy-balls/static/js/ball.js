@@ -24,9 +24,9 @@ class Ball {
     this.id = id;
     this.x = rand(60, W - 60);
     this.y = rand(60, H - 60);
-    const a = rand(0, Math.PI * 2);
-    this.dx = Math.cos(a);
-    this.dy = Math.sin(a);
+    // Guy-style persistent velocity (reference units, ~1.0-1.4 like the guys).
+    this.vx = rand(1.0, 1.4) * (Math.random() < 0.5 ? -1 : 1);
+    this.vy = rand(1.0, 1.35) * (Math.random() < 0.5 ? -1 : 1);
     this.hp = rand(30, 80);
     // IQ: how many bounces ahead this ball's ghost can foresee.
     this.iq = Math.round(rand(9, CONFIG.IQ_MAX));
@@ -41,24 +41,26 @@ class Ball {
     this.dragVY = 0;
   }
 
-  speed(){
-    return CONFIG.BASE_SPEED * speedFactor(this.hp) * (1 + this.boost);
+  // Effective px/sec velocity, scaled by the guy hpSpeed curve and boost.
+  pxVX(){
+    return this.vx * hpSpeed(this.hp) * CONFIG.PX_PER_UNIT * (1 + this.boost);
+  }
+  pxVY(){
+    return this.vy * hpSpeed(this.hp) * CONFIG.PX_PER_UNIT * (1 + this.boost);
   }
 
-  // Called when the ball hits a wall. Natural reflection first; then the
-  // ghost tests candidate routes (each bounced up to `iq` times) and picks
-  // whichever ends closest to the orb the ball wants. If the winner isn't
-  // the natural reflection, re-aim with a small boost toward that point.
-  bounceWall(nx, ny, W, H, orbs){
+  // Wall bounce: flip the velocity component (reference keepOnScreen style),
+  // then let the ghost test candidate routes; if a better one exists,
+  // rotate the velocity toward it with a small boost.
+  bounceWall(axis, W, H, orbs){   // axis: 'x' or 'y'
     const C = CONFIG;
-    const dot = this.dx * nx + this.dy * ny;
-    this.dx -= 2 * dot * nx;
-    this.dy -= 2 * dot * ny;
-    const natural = Math.atan2(this.dy, this.dx);
+    if (axis === 'x') this.vx = -this.vx; else this.vy = -this.vy;
 
     const orb = bestOrbFor(this, orbs);
-    if (!orb || this.iq < 2) return;
+    if (!orb || this.iq < 2) return;   // dumb balls just bounce
 
+    const sp = Math.hypot(this.vx, this.vy) || 1;
+    const natural = Math.atan2(this.vy, this.vx);
     const aim = Math.atan2(orb.y - this.y, orb.x - this.x);
     const spread = angleDelta(natural, aim);
 
@@ -74,8 +76,8 @@ class Ball {
 
     if (Math.abs(angleDelta(natural, bestAngle)) > 0.05){
       this.boost = C.BOOST;
-      this.dx = Math.cos(bestAngle);
-      this.dy = Math.sin(bestAngle);
+      this.vx = Math.cos(bestAngle) * sp;
+      this.vy = Math.sin(bestAngle) * sp;
     }
   }
 
@@ -84,18 +86,17 @@ class Ball {
     const C = CONFIG;
     if (this.dragging){ this.moveAccum = 0; return; }  // carried by cursor
 
-    const s = this.speed();
-    const ox = this.x, oy = this.y;
-    this.x += this.dx * s * dt;
-    this.y += this.dy * s * dt;
-    this.moveAccum += Math.hypot(this.x - ox, this.y - oy);
+    const mx = this.pxVX() * dt, my = this.pxVY() * dt;
+    this.x += mx;
+    this.y += my;
+    this.moveAccum += Math.hypot(mx, my);
     this.boost *= Math.exp(-C.BOOST_DECAY * dt);
 
     const r = C.BALL_R;
-    if (this.x < r)       { this.x = r;       this.bounceWall( 1, 0, W, H, orbs); }
-    else if (this.x > W-r){ this.x = W - r;   this.bounceWall(-1, 0, W, H, orbs); }
-    if (this.y < r)       { this.y = r;       this.bounceWall(0,  1, W, H, orbs); }
-    else if (this.y > H-r){ this.y = H - r;   this.bounceWall(0, -1, W, H, orbs); }
+    if (this.x < r)       { this.x = r;       this.bounceWall('x', W, H, orbs); }
+    else if (this.x > W-r){ this.x = W - r;   this.bounceWall('x', W, H, orbs); }
+    if (this.y < r)       { this.y = r;       this.bounceWall('y', W, H, orbs); }
+    else if (this.y > H-r){ this.y = H - r;   this.bounceWall('y', W, H, orbs); }
 
     // IQ drift: the slower / less a ball moves, the more IQ it may lose.
     this.iqTimer += dt;
@@ -103,9 +104,9 @@ class Ball {
       const avg = this.moveAccum / this.iqTimer;
       this.moveAccum = 0;
       this.iqTimer = 0;
-      if (avg < C.BASE_SPEED * 0.45){
+      if (avg < C.PX_PER_UNIT){
         if (Math.random() < 0.6) this.iq = Math.max(C.IQ_MIN, this.iq - 1);
-      } else if (avg > C.BASE_SPEED * 0.8){
+      } else if (avg > C.PX_PER_UNIT * 1.6){
         if (Math.random() < 0.35) this.iq = Math.min(C.IQ_MAX, this.iq + 1);
       }
     }

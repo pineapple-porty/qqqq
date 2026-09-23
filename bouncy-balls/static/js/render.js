@@ -69,7 +69,7 @@ const renderer = {
     // Balls — guy-style: hp label above, IQ label underneath.
     ctx.textAlign = 'center';
     for (const b of balls){
-      const f = speedFactor(b.hp);
+      const f = hpSpeed(b.hp);
       ctx.beginPath();
       ctx.arc(b.x, b.y, C.BALL_R, 0, Math.PI * 2);
       ctx.fillStyle = 'hsl(' + b.hue + ',70%,' + clamp(45 + f * 15, 30, 70) + '%)';

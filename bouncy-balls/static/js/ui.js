@@ -58,11 +58,15 @@ const ui = {
 
     window.addEventListener('mouseup', () => {
       if (this.dragBall){
-        // Fling: keep the cursor's velocity as the new direction.
-        const sp = Math.hypot(this.dragBall.dragVX, this.dragBall.dragVY);
-        if (sp > 1){
-          this.dragBall.dx = this.dragBall.dragVX / sp;
-          this.dragBall.dy = this.dragBall.dragVY / sp;
+        // Fling: convert cursor velocity into reference velocity units.
+        const ux = this.dragBall.dragVX / CONFIG.PX_PER_UNIT;
+        const uy = this.dragBall.dragVY / CONFIG.PX_PER_UNIT;
+        const sp = Math.hypot(ux, uy);
+        if (sp > 0.05){
+          // Cap at the reference guy velocity range so flings stay sane.
+          const capped = Math.min(sp, CONFIG.FLING_MAX) / sp;
+          this.dragBall.vx = ux * capped;
+          this.dragBall.vy = uy * capped;
         }
         this.dragBall.dragging = false;
         this.dragBall = null;
@@ -95,7 +99,7 @@ const ui = {
 
     const b = this.selected || this.hovered;
     if (b){
-      const f = speedFactor(b.hp);
+      const f = hpSpeed(b.hp);
       const hpPct = clamp((b.hp + 50) / 180 * 100, 0, 100);
       const hpColor = b.hp < 0 ? '#e5484d' : b.hp < 20 ? '#e8a33d' : '#4caf50';
       this.ballCard.innerHTML =

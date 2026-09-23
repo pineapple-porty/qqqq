@@ -10,11 +10,11 @@ function angleDelta(a, b){
   return d;
 }
 
-// Guy-style HP -> speed: 1.08^(hp/30) normalized so 60 HP = 1.0x, then our
-// low-HP taper so 20-100 HP feels normal and the ball stops around -50 HP.
-function speedFactor(hp){
+// Guy-style HP -> speed: exactly hello-wrld's hpSpeed = 1.08^(hp/30),
+// with a low-HP taper so the ball stops around -50 HP (never dies).
+function hpSpeed(hp){
   if (hp <= -50) return 0;
-  const guyCurve = Math.pow(1.08, hp / 30) / Math.pow(1.08, 60 / 30);
+  const guyCurve = Math.pow(1.08, hp / 30);
   const taper = hp < 20 ? (hp + 50) / 70 : 1;
-  return clamp(guyCurve * taper, 0, 1.6);
+  return clamp(guyCurve * taper, 0, 2.6);
 }

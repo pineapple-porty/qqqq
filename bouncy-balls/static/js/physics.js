@@ -5,9 +5,10 @@
 // Per-pair hard-hit cooldowns (guy-style).
 const hardHitTimes = new Map();
 
-// Ball-vs-ball: separate overlap, swap velocities along the normal, and deal
-// flat 30 damage when the closing speed exceeds the threshold — with a
-// 650ms per-pair cooldown, exactly like the guys in the reference game.
+// Ball-vs-ball: separate overlap, then swap velocity along the collision
+// normal exactly like the guys (relative normal component exchanged in
+// reference units). Fast hits deal flat 30 damage with a 650ms per-pair
+// cooldown, like the reference game.
 function collideBalls(balls, stats, now){
   const C = CONFIG;
   for (let i = 0; i < balls.length; i++){
@@ -24,15 +25,14 @@ function collideBalls(balls, stats, now){
       a.x -= nx * push; a.y -= ny * push;
       b.x += nx * push; b.y += ny * push;
 
-      const sa = a.speed(), sb = b.speed();
-      const avx = a.dx * sa, avy = a.dy * sa;
-      const bvx = b.dx * sb, bvy = b.dy * sb;
-
+      // Effective px/sec velocities (hpSpeed-scaled, like the reference).
+      const avx = a.pxVX(), avy = a.pxVY();
+      const bvx = b.pxVX(), bvy = b.pxVY();
       const rel = (avx - bvx) * nx + (avy - bvy) * ny;
       if (rel > 0) continue;   // already separating
 
-      // Guy-style hard-hit check.
-      const closing = -rel / C.REFERENCE_UNIT;
+      // Guy-style hard-hit check: closing speed in reference units.
+      const closing = -rel / C.PX_PER_UNIT;
       const key = a.id + '-' + b.id;
       if (closing >= C.HIT_CLOSING_SPEED &&
           now - (hardHitTimes.get(key) || 0) > C.HIT_COOLDOWN_MS){
@@ -42,14 +42,14 @@ function collideBalls(balls, stats, now){
         stats.hits++;
       }
 
-      // Equal-mass elastic swap of normal components.
-      const ma = avx * nx + avy * ny;
-      const mb = bvx * nx + bvy * ny;
-      const dxA = nx * (mb - ma), dyA = ny * (mb - ma);
-      const na = Math.hypot(avx + dxA, avy + dyA) || 1;
-      const nb = Math.hypot(bvx - dxA, bvy - dyA) || 1;
-      a.dx = (avx + dxA) / na; a.dy = (avy + dyA) / na;
-      b.dx = (bvx - dxA) / nb; b.dy = (bvy - dyA) / nb;
+      // Reference velocity swap: exchange normal components in
+      // reference units (exactly like the guys' relative swap).
+      const relU = (b.vx * hpSpeed(b.hp) - a.vx * hpSpeed(a.hp)) * nx
+                 + (b.vy * hpSpeed(b.hp) - a.vy * hpSpeed(a.hp)) * ny;
+      if (relU < 0){
+        a.vx += relU * nx; a.vy += relU * ny;
+        b.vx -= relU * nx; b.vy -= relU * ny;
+      }
     }
   }
 }
