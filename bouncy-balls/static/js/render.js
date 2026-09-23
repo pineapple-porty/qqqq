@@ -36,8 +36,8 @@ const renderer = {
     for (let y = 40; y < H; y += 40){ ctx.moveTo(0, y); ctx.lineTo(W, y); }
     ctx.stroke();
 
-    // Orbs — styled after the hello-wrld reference: green #54b86b with a
-    // #fff7cf border and #b9f29b glow; blue #1874df with #d8f0ff and glow.
+    // Orbs — styled after the reference: green #54b86b w/ #fff7cf border and
+    // #b9f29b glow; blue #1874df w/ #d8f0ff border and glow.
     for (const o of pickups.orbs){
       if (o.dead) continue;
       const R = o.type === 'blue' ? 11 : 9;
@@ -66,7 +66,8 @@ const renderer = {
       ctx.restore();
     }
 
-    // Balls.
+    // Balls — guy-style: each carries an hp label.
+    ctx.textAlign = 'center';
     for (const b of balls){
       const f = speedFactor(b.hp);
       ctx.beginPath();
@@ -74,13 +75,6 @@ const renderer = {
       ctx.fillStyle = 'hsl(' + b.hue + ',70%,' + clamp(45 + f * 15, 30, 70) + '%)';
       ctx.fill();
 
-      if (b.boost > 0.05){
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = 'rgba(255,255,255,' + Math.min(b.boost, 0.5) + ')';
-        ctx.beginPath();
-        ctx.arc(b.x, b.y, C.BALL_R + 6, 0, Math.PI * 2);
-        ctx.stroke();
-      }
       if (b.armor > 0){
         ctx.lineWidth = 3;
         ctx.strokeStyle = 'rgba(200,162,74,0.9)';
@@ -88,19 +82,30 @@ const renderer = {
         ctx.arc(b.x, b.y, C.BALL_R + 4, 0, Math.PI * 2);
         ctx.stroke();
       }
-
+      if (b.boost > 0.05){
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(255,255,255,' + Math.min(b.boost, 0.5) + ')';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, C.BALL_R + 6, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       if (b === selected || b === hovered){
         ctx.lineWidth = 2;
         ctx.strokeStyle = b === selected ? '#ffffff' : 'rgba(255,255,255,0.6)';
         ctx.beginPath();
         ctx.arc(b.x, b.y, C.BALL_R + 8, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.fillStyle = '#0e1220';
-        ctx.font = 'bold 10px system-ui';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(b.iq, b.x, b.y);
       }
+
+      // IQ in the middle, hp label above (like the guys' "hp:123").
+      ctx.fillStyle = '#0e1220';
+      ctx.font = 'bold 10px system-ui';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(b.iq, b.x, b.y);
+      ctx.fillStyle = 'rgba(232,236,245,0.85)';
+      ctx.font = '11px monospace';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText('hp:' + Math.round(b.hp), b.x, b.y - C.BALL_R - 6);
     }
   },
 };

@@ -4,6 +4,7 @@
 
 (function main(){
   const canvas = document.getElementById('stage');
+  canvas.style.cursor = 'grab';
   renderer.init(canvas);
 
   const state = {
@@ -26,11 +27,10 @@
       b.update(dt, renderer.W, renderer.H, state.pickups.orbs);
     }
     moveOrbs(state.pickups, dt, renderer.W, renderer.H);
-    collideBalls(state.balls, state.stats);
+    collideBalls(state.balls, state.stats, now);
     collidePickups(state.balls, state.pickups, state.stats);
     updatePickups(state.pickups, dt, renderer.W, renderer.H);
 
-    // Draw with the current hover/selection state.
     renderer.draw({
       balls: state.balls,
       pickups: state.pickups,

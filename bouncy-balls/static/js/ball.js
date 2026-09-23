@@ -4,7 +4,6 @@
 
 // Fly a "ghost" straight from (x, y) at `angle`, reflecting off walls,
 // for exactly `iq` bounces. Returns where it ends up.
-// W/H come from the renderer (arena size).
 function simulateGhost(x, y, angle, iq, W, H){
   const r = CONFIG.BALL_R;
   let cx = x, cy = y;
@@ -36,47 +35,43 @@ class Ball {
     this.hue = rand(0, 360);
     this.moveAccum = 0;
     this.iqTimer = rand(0, 3);
+    // Guy-style dragging state
+    this.dragging = false;
+    this.dragVX = 0;
+    this.dragVY = 0;
   }
 
   speed(){
     return CONFIG.BASE_SPEED * speedFactor(this.hp) * (1 + this.boost);
   }
 
-  // Called when the ball hits a wall. The ball first reflects naturally;
-  // then, if smart enough, it sends a ghost along candidate routes —
-  // each bounced up to `iq` times — and picks whichever ends closest to
-  // the orb it wants. If the winner isn't the natural reflection, it
-  // re-aims and gets a small boost pushing it that way.
+  // Called when the ball hits a wall. Natural reflection first; then the
+  // ghost tests candidate routes (each bounced up to `iq` times) and picks
+  // whichever ends closest to the orb the ball wants. If the winner isn't
+  // the natural reflection, re-aim with a small boost toward that point.
   bounceWall(nx, ny, W, H, orbs){
     const C = CONFIG;
-
-    // 1. Natural reflection.
     const dot = this.dx * nx + this.dy * ny;
     this.dx -= 2 * dot * nx;
     this.dy -= 2 * dot * ny;
     const natural = Math.atan2(this.dy, this.dx);
 
-    // 2. Where do we want to go? (dumb balls just bounce)
     const orb = bestOrbFor(this, orbs);
     if (!orb || this.iq < 2) return;
 
-    // 3. Candidate directions: sweep from the natural bounce toward the
-    //    direct aim (plus a slight overshoot past it).
     const aim = Math.atan2(orb.y - this.y, orb.x - this.x);
     const spread = angleDelta(natural, aim);
 
     let bestAngle = natural, bestScore = Infinity;
     for (let i = 0; i < C.GHOST_CANDIDATES; i++){
-      const f = (i / (C.GHOST_CANDIDATES - 1)) * 1.15;   // 0 .. 1.15
+      const f = (i / (C.GHOST_CANDIDATES - 1)) * 1.15;
       const angle = natural + spread * f;
       const end = simulateGhost(this.x, this.y, angle, this.iq, W, H);
       const score = (orb.x - end.x) ** 2 + (orb.y - end.y) ** 2
-                  - (orb.type === 'blue' ? 40000 : 0);    // blue orbs are worth extra
+                  - (orb.type === 'blue' ? 40000 : 0);
       if (score < bestScore){ bestScore = score; bestAngle = angle; }
     }
 
-    // 4. If the ghost found a better route than "just keep bouncing",
-    //    take it — with a small boost toward the point we want.
     if (Math.abs(angleDelta(natural, bestAngle)) > 0.05){
       this.boost = C.BOOST;
       this.dx = Math.cos(bestAngle);
@@ -84,9 +79,11 @@ class Ball {
     }
   }
 
-  // Balls fly straight; nothing changes direction mid-flight.
+  // Balls fly straight; nothing changes direction mid-flight (unless dragged).
   update(dt, W, H, orbs){
     const C = CONFIG;
+    if (this.dragging){ this.moveAccum = 0; return; }  // carried by cursor
+
     const s = this.speed();
     const ox = this.x, oy = this.y;
     this.x += this.dx * s * dt;
@@ -103,7 +100,7 @@ class Ball {
     // IQ drift: the slower / less a ball moves, the more IQ it may lose.
     this.iqTimer += dt;
     if (this.iqTimer >= C.IQ_CHECK_INTERVAL){
-      const avg = this.moveAccum / this.iqTimer;  // px/sec actually moved
+      const avg = this.moveAccum / this.iqTimer;
       this.moveAccum = 0;
       this.iqTimer = 0;
       if (avg < C.BASE_SPEED * 0.45){
@@ -112,6 +109,11 @@ class Ball {
         if (Math.random() < 0.35) this.iq = Math.min(C.IQ_MAX, this.iq + 1);
       }
     }
+  }
+
+  // Guy-style damage: armor negates its 30-40% share.
+  takeHit(dmg){
+    this.hp -= dmg * (1 - this.armor);
   }
 }
 

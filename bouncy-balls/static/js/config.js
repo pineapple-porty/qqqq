@@ -1,13 +1,12 @@
 // Global tuning knobs for the whole simulation.
 'use strict';
 const CONFIG = {
-  BASE_SPEED: 95,           // px/sec at "normal" speed
+  BASE_SPEED: 80,           // px/sec reference point for the guy speed curve
   BALL_R: 12,               // ball radius, px
   NUM_BALLS: 14,
   ORB_COUNT: 6,
   ARMOR_COUNT: 3,
   BLUE_CHANCE: 0.12,        // blue orbs are uncommon
-  COLLISION_THRESHOLD: 5,   // relative speed (in BASE_SPEED units) needed to hurt
   PICKUP_RADIUS: 8,         // extra pickup reach around a ball
   IQ_MAX: 15,
   IQ_MIN: 1,
@@ -20,7 +19,13 @@ const CONFIG = {
   BOOST: 0.45,              // speed boost after a smart re-aim
   BOOST_DECAY: 1.6,         // per-second exponential decay of the boost
 
-  // Orbs drift around the arena like the hello-wrld reference game.
-  ORB_SPEED: 40,            // green orb drift speed, px/sec
-  ORB_BLUE_SPEED_RATIO: 0.5 // rare blue orbs drift slower
+  // Orbs drift around the arena like the reference game.
+  ORB_SPEED: 40,
+  ORB_BLUE_SPEED_RATIO: 0.5,
+
+  // Guy-style hard-hit collisions
+  HIT_DAMAGE: 30,           // flat damage per hard hit (like the guys)
+  HIT_COOLDOWN_MS: 650,     // per-pair cooldown, like the guys
+  HIT_CLOSING_SPEED: 7.5,   // closing speed in "reference" velocity units
+  REFERENCE_UNIT: 60,       // reference 1.0 velocity ~= 60 px/sec
 };

@@ -12,7 +12,7 @@
   <aside id="menu">
     <h1>🏀 Bouncy Balls — IQ Arena</h1>
     <h2>Selected / Hovered Ball</h2>
-    <div class="card" id="ballCard"><span class="dim">Click a ball to select it.<br/>Hover to see its IQ.</span></div>
+    <div class="card" id="ballCard"><span class="dim">Click a ball to select it.<br/>Hover to see its IQ. Drag to throw it.</span></div>
     <h2>World</h2>
     <div class="card" id="worldCard"></div>
     <h2>Legend</h2>
@@ -20,10 +20,11 @@
       <span class="dot green"></span>Green orb: +20–30 HP<br>
       <span class="dot blue"></span>Blue orb (rare): +100–130 HP<br>
       <span class="dot armor"></span>Armor: negates 30–40% of hit damage<br>
-      <span class="dim">IQ = how many bounces ahead a ball can "see".<br>
-      Slow balls lose IQ (min 1); active balls regain it (max 15).<br>
-      High-speed collisions deal damage. HP drives speed:<br>
-      20–100 HP = normal, −50 HP ≈ stopped.</span>
+      <span class="dim">Balls are like the guys: drag them around, they carry
+      an hp label, and speed follows 1.08^(hp/30). They fly straight; at each
+      wall bounce their IQ sends a "ghost" ahead for up to IQ bounces to test
+      routes. Hard collisions (fast + 0.65s cooldown) deal 30 damage. Slow
+      balls lose IQ (min 1), active balls regain it (max 15).</span>
     </div>
   </aside>
 </div>
