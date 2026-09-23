@@ -1,33 +1,33 @@
 # 🏀 Bouncy Balls — IQ Arena
 
-An HTML/CSS/JavaScript simulation served by a tiny Flask app.
+A canvas-based HTML/JavaScript simulation served by a tiny Flask app.
 
-## Project layout
+## Project structure
 
 ```
 bouncy-balls/
-├── app.py              # Flask server (serves everything on port 8000)
+├── app.py                 # Flask server (port 8000)
 ├── requirements.txt
-├── index.html          # page skeleton
-├── css/
-│   └── style.css       # all styling
-└── js/
-    ├── config.js       # tunable constants (speeds, IQ bounds, damage…)
-    ├── utils.js        # rand/clamp + HP→speed curve
-    ├── ball.js         # Ball class: movement, IQ lookahead, IQ drift
-    ├── pickups.js      # orbs & armor: spawn, attraction, pickup, respawn
-    ├── physics.js      # ball-vs-ball elastic collisions + damage
-    ├── render.js       # canvas renderer (DPR-aware)
-    ├── menu.js         # side menu + hover tooltip (throttled DOM updates)
-    └── main.js         # world state + main loop
+├── index.html             # page skeleton
+└── static/
+    ├── style.css           # all styling (side menu, tooltip)
+    └── js/
+        ├── config.js       # all tuning knobs in one place
+        ├── utils.js        # rand/clamp, angle math, HP->speed curve
+        ├── ball.js         # Ball class: steering, IQ lookahead, IQ drift
+        ├── pickups.js      # orb/armor spawning & respawns
+        ├── physics.js      # ball-vs-ball & ball-vs-pickup collisions
+        ├── render.js       # canvas drawing
+        ├── ui.js           # side menu, tooltip, selection
+        └── main.js         # bootstrap + requestAnimationFrame loop
 ```
 
-## Gameplay rules
+## The rules
 
-- **Balls** bounce around the arena. Their **IQ (1–15)** is how many bounces
+- **Balls** bounce around the arena. Their **IQ** (1–15) is how many bounces
   ahead they can "see" — smarter balls steer toward orbs and aim their bounces.
-- **IQ tooltip on hover**; click a ball to select it — full stats appear in the
-  **side menu** (IQ, HP, armor, speed, world stats).
+- **IQ tooltip on hover**; click a ball to select it, and full stats appear in
+  the **side menu** (IQ, HP, armor, speed, world stats).
 - **HP drives speed**: 20–100 HP = normal speed; below 20 they taper off and
   stop around **-50 HP**. Balls never die.
 - **IQ drift**: slow, barely-moving balls lose IQ (down to 1); active balls
@@ -36,12 +36,6 @@ bouncy-balls/
 - **Armor pickups** negate 30–40% of collision damage.
 - **Physics**: fast ball-vs-ball collisions deal damage proportional to impact
   speed; slow touches are harmless.
-
-## Performance notes
-
-- Single `<canvas>`, render capped at 2× device pixel ratio.
-- Menu DOM writes throttled to 4×/sec instead of every frame.
-- Delta-time capped so tab-switch spikes can't teleport balls.
 
 ## Run in a GitHub Codespace
 
@@ -52,6 +46,7 @@ python app.py
 
 Then open the forwarded **port 8000** from the Codespace "Ports" tab.
 
-## Run locally
+## Tuning
 
-Same two commands — then open <http://localhost:8000>.
+Everything lives in `static/js/config.js` — ball count, orb counts, blue-orb
+rarity, collision threshold, IQ bounds, speed curve, etc.

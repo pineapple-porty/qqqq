@@ -12,14 +12,9 @@ def index():
     return send_from_directory(BASE_DIR, "index.html")
 
 
-@app.route("/css/<path:filename>")
-def css(filename):
-    return send_from_directory(BASE_DIR / "css", filename)
-
-
-@app.route("/js/<path:filename>")
-def js(filename):
-    return send_from_directory(BASE_DIR / "js", filename)
+@app.route("/static/<path:filename>")
+def static_files(filename: str):
+    return send_from_directory(BASE_DIR / "static", filename)
 
 
 if __name__ == "__main__":
