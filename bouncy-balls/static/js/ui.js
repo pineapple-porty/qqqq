@@ -59,11 +59,12 @@ const ui = {
     window.addEventListener('mouseup', () => {
       if (this.dragBall){
         // Fling: convert cursor velocity into reference velocity units.
+        // Big, fast flings send the ball rocketing across the screen —
+        // capped only so it can't tunnel through walls in one frame.
         const ux = this.dragBall.dragVX / CONFIG.PX_PER_UNIT;
         const uy = this.dragBall.dragVY / CONFIG.PX_PER_UNIT;
         const sp = Math.hypot(ux, uy);
         if (sp > 0.05){
-          // Cap at the reference guy velocity range so flings stay sane.
           const capped = Math.min(sp, CONFIG.FLING_MAX) / sp;
           this.dragBall.vx = ux * capped;
           this.dragBall.vy = uy * capped;
@@ -111,10 +112,10 @@ const ui = {
         (b.armor > 0 ? Math.round(b.armor * 100) + '% absorb' : 'none') + '</b></div>' +
         '<div class="stat"><span>Speed (1.08^(hp/30))</span><b>' + Math.round(f * 100) + '%' +
         (b.boost > 0.05 ? ' ⚡' + Math.round(b.boost * 100) + '%' : '') + '</b></div>' +
-        '<div class="dim">Drag to carry, release to fling.</div>';
+        '<div class="dim">Drag to carry, flick to send it flying.</div>';
     } else {
       this.ballCard.innerHTML =
-        '<span class="dim">Click a ball to select it.<br/>Hover to see its IQ. Drag to throw it.</span>';
+        '<span class="dim">Click a ball to select it.<br/>Hover to see its IQ. Flick to send it flying.</span>';
     }
 
     const s = state.stats;

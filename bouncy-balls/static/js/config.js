@@ -27,5 +27,8 @@ const CONFIG = {
   HIT_DAMAGE: 30,           // flat damage per hard hit (like the guys)
   HIT_COOLDOWN_MS: 650,     // per-pair cooldown, like the guys
   HIT_CLOSING_SPEED: 7.5,   // closing speed in reference velocity units
-  FLING_MAX: 1.6,           // cap on fling velocity, reference units
+
+  // Flings: fast drags can rocket a ball across the screen.
+  // Capped only so it can't tunnel through walls in one frame.
+  FLING_MAX: 14,            // reference units (~840 px/sec raw)
 };
