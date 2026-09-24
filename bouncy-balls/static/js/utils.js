@@ -2,7 +2,6 @@
 const rand  = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 
-// Smallest signed angle difference between two angles.
 function angleDelta(a, b){
   let d = b - a;
   while (d >  Math.PI) d -= Math.PI * 2;
@@ -10,11 +9,18 @@ function angleDelta(a, b){
   return d;
 }
 
-// Guy-style HP -> speed: exactly hello-wrld's hpSpeed = 1.08^(hp/30),
-// with a low-HP taper so the ball stops around -50 HP (never dies).
+// Reference hpSpeed, capped so boosted guys stay on screen.
 function hpSpeed(hp){
-  if (hp <= -50) return 0;
-  const guyCurve = Math.pow(1.08, hp / 30);
-  const taper = hp < 20 ? (hp + 50) / 70 : 1;
-  return clamp(guyCurve * taper, 0, 2.6);
+  return Math.min(Math.pow(1.08, hp / 30), CONFIG.HP_SPEED_CAP);
+}
+
+function makeElement(className, parent){
+  const el = document.createElement('div');
+  el.className = className;
+  (parent || document.body).appendChild(el);
+  return el;
+}
+
+function place(obj){
+  obj.element.style.transform = 'translate3d(' + obj.x + 'px,' + obj.y + 'px,0)';
 }

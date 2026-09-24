@@ -1,132 +1,99 @@
 'use strict';
 
-// --- Side menu, tooltip, selection, guy-style dragging --------------------
+// --- Tooltip, side menu, selection, drag & fling ---------------------------
+const tooltip = document.getElementById('tooltip');
+const ballCard = document.getElementById('ballCard');
+const worldCard = document.getElementById('worldCard');
+let hovered = null, selected = null, dragBall = null;
+let lastMouse = { x: 0, y: 0, t: 0 }, lastMenu = 0;
 
-const ui = {
-  tooltip: null, ballCard: null, worldCard: null,
-  hovered: null, selected: null, dragBall: null,
-  lastMouse: { x: 0, y: 0, t: 0 },
-  _lastMenu: 0,
-
-  init(canvas, state){
-    this.tooltip   = document.getElementById('tooltip');
-    this.ballCard  = document.getElementById('ballCard');
-    this.worldCard = document.getElementById('worldCard');
-
-    // Guy-style drag: grab, carry, fling on release.
-    canvas.addEventListener('mousedown', (e) => {
-      const r = canvas.getBoundingClientRect();
-      const x = e.clientX - r.left, y = e.clientY - r.top;
-      const b = this.pick(x, y, state.balls);
-      if (b){
-        this.dragBall = b;
-        this.selected = b;
-        b.dragging = true;
-        b.dragVX = 0; b.dragVY = 0;
-        this.lastMouse = { x, y, t: performance.now() };
-        canvas.style.cursor = 'grabbing';
-        this.refresh(state, true);
-      }
+function initUI(){
+  guys.forEach((guy) => {
+    guy.element.addEventListener('mouseenter', () => {
+      hovered = guy;
+      tooltip.style.display = 'block';
+      tooltip.textContent = 'Ball #' + guy.id + ' — IQ:' + guy.iq + ' hp:' + Math.round(guy.hp);
+      refreshMenu(true);
     });
-
-    window.addEventListener('mousemove', (e) => {
-      const r = canvas.getBoundingClientRect();
-      const x = e.clientX - r.left, y = e.clientY - r.top;
-      this.hovered = this.pick(x, y, state.balls);
-
-      if (this.hovered && !this.dragBall){
-        this.tooltip.style.display = 'block';
-        this.tooltip.style.left = (e.clientX + 14) + 'px';
-        this.tooltip.style.top  = (e.clientY + 14) + 'px';
-        this.tooltip.textContent = 'Ball #' + this.hovered.id +
-          ' — IQ: ' + this.hovered.iq + '  hp:' + Math.round(this.hovered.hp);
-      } else {
-        this.tooltip.style.display = 'none';
-      }
-
-      if (this.dragBall){
-        const now = performance.now();
-        const dt = Math.max((now - this.lastMouse.t) / 1000, 0.001);
-        this.dragBall.dragVX = (x - this.lastMouse.x) / dt;
-        this.dragBall.dragVY = (y - this.lastMouse.y) / dt;
-        const rad = CONFIG.BALL_R;
-        this.dragBall.x = clamp(x, rad, renderer.W - rad);
-        this.dragBall.y = clamp(y, rad, renderer.H - rad);
-        this.lastMouse = { x, y, t: now };
-      }
+    guy.element.addEventListener('mouseleave', () => {
+      hovered = null;
+      tooltip.style.display = 'none';
+      refreshMenu(true);
     });
-
-    window.addEventListener('mouseup', () => {
-      if (this.dragBall){
-        // Fling: convert cursor velocity into reference velocity units.
-        // Big, fast flings send the ball rocketing across the screen —
-        // capped only so it can't tunnel through walls in one frame.
-        const ux = this.dragBall.dragVX / CONFIG.PX_PER_UNIT;
-        const uy = this.dragBall.dragVY / CONFIG.PX_PER_UNIT;
-        const sp = Math.hypot(ux, uy);
-        if (sp > 0.05){
-          const capped = Math.min(sp, CONFIG.FLING_MAX) / sp;
-          this.dragBall.vx = ux * capped;
-          this.dragBall.vy = uy * capped;
-        }
-        this.dragBall.dragging = false;
-        this.dragBall = null;
-        canvas.style.cursor = 'grab';
-      }
+    guy.element.addEventListener('click', () => {
+      selected = guy;
+      refreshMenu(true);
     });
-
-    canvas.addEventListener('mouseleave', () => {
-      if (!this.dragBall){ this.hovered = null; this.tooltip.style.display = 'none'; }
+    guy.element.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      dragBall = guy;
+      selected = guy;
+      guy.dragging = true;
+      guy.dragVX = 0; guy.dragVY = 0;
+      guy.element.classList.add('is-dragging');
+      lastMouse = { x: e.clientX, y: e.clientY, t: performance.now() };
+      tooltip.style.display = 'none';
+      refreshMenu(true);
     });
-    canvas.addEventListener('click', () => {
-      if (this.hovered) this.selected = this.hovered;
-      this.refresh(state, true);
-    });
-  },
+  });
 
-  pick(x, y, balls){
-    const rr = CONFIG.BALL_R + 8, r2 = rr * rr;
-    for (const b of balls){
-      if ((x - b.x) ** 2 + (y - b.y) ** 2 < r2) return b;
-    }
-    return null;
-  },
-
-  // Throttled so we don't rebuild DOM every frame.
-  refresh(state, force){
+  window.addEventListener('mousemove', (e) => {
+    if (!dragBall) return;
     const now = performance.now();
-    if (!force && now - this._lastMenu < CONFIG.MENU_REFRESH_MS) return;
-    this._lastMenu = now;
+    const dt = Math.max((now - lastMouse.t) / 1000, 0.001);
+    dragBall.dragVX = (e.clientX - lastMouse.x) / dt;   // px/sec
+    dragBall.dragVY = (e.clientY - lastMouse.y) / dt;
+    dragBall.x = clamp(e.clientX - dragBall.width / 2, 0, innerWidth - dragBall.width);
+    dragBall.y = clamp(e.clientY - dragBall.height / 2, 0, innerHeight - dragBall.height);
+    lastMouse = { x: e.clientX, y: e.clientY, t: now };
+    place(dragBall);
+  });
 
-    const b = this.selected || this.hovered;
-    if (b){
-      const f = hpSpeed(b.hp);
-      const hpPct = clamp((b.hp + 50) / 180 * 100, 0, 100);
-      const hpColor = b.hp < 0 ? '#e5484d' : b.hp < 20 ? '#e8a33d' : '#4caf50';
-      this.ballCard.innerHTML =
-        '<div class="stat"><span>Ball</span><b>#' + b.id + '</b></div>' +
-        '<div class="stat"><span>IQ (ghost bounces ahead)</span><b>' + b.iq + ' / ' + CONFIG.IQ_MAX + '</b></div>' +
-        '<div class="stat"><span>HP</span><b>' + Math.round(b.hp) + '</b></div>' +
-        '<div class="hpbar"><i style="width:' + hpPct + '%;background:' + hpColor + '"></i></div>' +
-        '<div class="stat"><span>Armor</span><b>' +
-        (b.armor > 0 ? Math.round(b.armor * 100) + '% absorb' : 'none') + '</b></div>' +
-        '<div class="stat"><span>Speed (1.08^(hp/30))</span><b>' + Math.round(f * 100) + '%' +
-        (b.boost > 0.05 ? ' ⚡' + Math.round(b.boost * 100) + '%' : '') + '</b></div>' +
-        '<div class="dim">Drag to carry, flick to send it flying.</div>';
-    } else {
-      this.ballCard.innerHTML =
-        '<span class="dim">Click a ball to select it.<br/>Hover to see its IQ. Flick to send it flying.</span>';
+  window.addEventListener('mouseup', () => {
+    if (!dragBall) return;
+    // Fling: cursor px/sec -> px/frame (reference velocity units), capped.
+    const ux = dragBall.dragVX / 60, uy = dragBall.dragVY / 60;
+    const sp = Math.hypot(ux, uy);
+    if (sp > 0.05){
+      const capped = Math.min(sp, CONFIG.FLING_MAX) / sp;
+      dragBall.vx = ux * capped;
+      dragBall.vy = uy * capped;
     }
+    dragBall.dragging = false;
+    dragBall.element.classList.remove('is-dragging');
+    dragBall = null;
+  });
+}
 
-    const s = state.stats;
-    const iqs = state.balls.map((x) => x.iq);
-    this.worldCard.innerHTML =
-      '<div class="stat"><span>Balls alive</span><b>' + state.balls.length + '</b></div>' +
-      '<div class="stat"><span>Green orbs eaten</span><b>' + s.green + '</b></div>' +
-      '<div class="stat"><span>Blue orbs eaten</span><b>' + s.blue + '</b></div>' +
-      '<div class="stat"><span>Armor grabbed</span><b>' + s.armor + '</b></div>' +
-      '<div class="stat"><span>Hard hits (30 dmg)</span><b>' + s.hits + '</b></div>' +
-      '<div class="stat"><span>Smarter ball</span><b>IQ ' + Math.max.apply(null, iqs) + '</b></div>' +
-      '<div class="stat"><span>Dumbest ball</span><b>IQ ' + Math.min.apply(null, iqs) + '</b></div>';
-  },
-};
+// Throttled so we don't rebuild DOM every frame.
+function refreshMenu(force){
+  const now = performance.now();
+  if (!force && now - lastMenu < CONFIG.MENU_REFRESH_MS) return;
+  lastMenu = now;
+
+  const b = selected || hovered;
+  if (b){
+    ballCard.innerHTML =
+      '<div class="stat"><span>Ball</span><b>#' + b.id + '</b></div>' +
+      '<div class="stat"><span>IQ (ghost bounces)</span><b>' + b.iq + ' / ' + CONFIG.IQ_MAX + '</b></div>' +
+      '<div class="stat"><span>HP</span><b>' + Math.round(b.hp) + (b.boostEnds ? ' ⚡boost' : '') + '</b></div>' +
+      '<div class="stat"><span>Armor</span><b>' + (b.armor > 0 ? Math.round(b.armor) + ' (' + b.armorType + ')' : 'none') + '</b></div>' +
+      '<div class="stat"><span>Speed (1.08^(hp/30))</span><b>' + Math.round(hpSpeed(b.hp) * 100) + '%</b></div>';
+  } else {
+    ballCard.innerHTML =
+      '<span class="dim">Click a ball to select it. Hover for IQ. Drag & flick to fling.</span>';
+  }
+
+  const iqs = guys.map((x) => x.iq);
+  worldCard.innerHTML =
+    '<div class="stat"><span>Balls</span><b>' + guys.length + '</b></div>' +
+    '<div class="stat"><span>Green balls eaten</span><b>' + stats.green + '</b></div>' +
+    '<div class="stat"><span>Blue boosts</span><b>' + stats.blue + '</b></div>' +
+    '<div class="stat"><span>Armor grabbed</span><b>' + stats.armor + '</b></div>' +
+    '<div class="stat"><span>Hard hits (30)</span><b>' + stats.hits + '</b></div>' +
+    '<div class="stat"><span>Grenades thrown</span><b>' + stats.grenades + '</b></div>' +
+    '<div class="stat"><span>Walls burst</span><b>' + stats.wallsBurst + '</b></div>' +
+    '<div class="stat"><span>Hazard hits</span><b>' + stats.hazards + '</b></div>' +
+    '<div class="stat"><span>Walls / hazards / bunkers</span><b>' + walls.length + ' / ' + hazards.length + ' / ' + bunkers.length + '</b></div>' +
+    '<div class="stat"><span>Smarter / dumbest IQ</span><b>' + Math.max.apply(null, iqs) + ' / ' + Math.min.apply(null, iqs) + '</b></div>';
+}

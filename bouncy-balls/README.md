@@ -1,6 +1,7 @@
 # 🏀 Bouncy Balls — IQ Arena
 
-A canvas-based HTML/JavaScript simulation served by a tiny Flask app.
+A full port of the hello-wrld game design, with IQ bouncy balls as the guys,
+served by a tiny Flask app.
 
 ## Project structure
 
@@ -8,38 +9,39 @@ A canvas-based HTML/JavaScript simulation served by a tiny Flask app.
 bouncy-balls/
 ├── app.py                 # Flask server (port 8000)
 ├── requirements.txt
-├── index.html             # page skeleton
+├── index.html             # hello-wrld page + IQ Arena side menu
 └── static/
-    ├── style.css           # all styling (side menu, tooltip)
+    ├── style.css           # hello-wrld design, copied 1-1 (+ menu)
     └── js/
-        ├── config.js       # all tuning knobs in one place
-        ├── utils.js        # rand/clamp, angle math, HP->speed curve
-        ├── ball.js         # Ball class: ghost lookahead at bounces, IQ drift
-        ├── pickups.js      # orb/armor spawning & respawns
-        ├── physics.js      # ball-vs-ball & ball-vs-pickup collisions
-        ├── render.js       # canvas drawing
-        ├── ui.js           # side menu, tooltip, selection
+        ├── config.js       # every tuning knob in one place
+        ├── utils.js        # rand/clamp, hpSpeed (1.08^(hp/30)), DOM helpers
+        ├── entities.js      # green/blue balls, flyers, armor, walls,
+        │                    # hazards, grenades, bunkers, bullets
+        ├── ball.js         # IQ balls (guys): ghost AI, collisions, grenades
+        ├── ui.js           # side menu, tooltip, selection, drag & fling
         └── main.js         # bootstrap + requestAnimationFrame loop
 ```
 
-## The rules
+## Features (hello-wrld, 1-1)
 
-- **Balls fly straight** until they hit a wall — no mid-flight steering.
-- **IQ (1–15)** is how many bounces ahead a ball's **ghost** can see. At each
-  wall bounce the ghost tests candidate routes (each bounced up to IQ times)
-  and checks which one ends closest to the orb the ball wants. If the best
-  route differs from the natural "just keep bouncing" reflection, the ball
-  re-aims along it and gets a **small temporary speed boost** toward that point.
-- **IQ tooltip on hover**; click a ball to select it, and full stats appear in
-  the **side menu** (IQ, HP, armor, speed, world stats).
-- **HP drives speed**: 20–100 HP = normal speed; below 20 they taper off and
-  stop around **-50 HP**. Balls never die.
-- **IQ drift**: slow, barely-moving balls lose IQ (down to 1); active balls
-  slowly regain it (up to 15).
-- **Green orbs** give 20–30 HP; rare **blue orbs** give 100–130 HP.
-- **Armor pickups** negate 30–40% of collision damage.
-- **Physics**: fast ball-vs-ball collisions deal damage proportional to impact
-  speed; slow touches are harmless.
+- **IQ bouncy balls** replace the guys: draggable with fling, hp + IQ labels,
+  speed = 1.08^(hp/30), hard hits (closing ≥ 7.5) deal 30 damage with a 650ms
+  per-pair cooldown. Each wall bounce, an IQ-scaled **ghost** previews up to
+  IQ bounces ahead and re-aims toward health with a small boost.
+- **16 green health balls** drift around; +30 hp each; respawn when eaten.
+- **Blue balls** appear when 3+ balls are below -100 hp: touching one grants
+  a 3000hp rocket boost for 3 seconds (collected hp is banked and restored).
+- **Armor squares** (~21% spawn chance, 10s cooldown): green soaks 5000,
+  rare purple 10000; every hit splits half to armor, half to hp.
+- **Grenades**: each ball throws one (2s global, 5s per-ball cooldown),
+  200 damage on a 1.5s fuse, gravity-affected.
+- **Bunkers** spawn when 2+ balls reach 2000hp: mini-gun (2 dmg, 200ms) and
+  bounce-gun (30 dmg, 4 bounces, 12-dmg burst).
+- **Striped walls** spawn every 5s; 14 fast hits (or timeout) breaks them
+  into a burst of 200 collectible health balls.
+- **Black hazards** hunt any 1500+ hp ball: 500 damage on contact.
+- **14 flyers** shepherd the 3 weakest balls toward the nearest health.
+- **Page design** copied 1-1 from hello-wrld, plus the IQ Arena side menu.
 
 ## Run in a GitHub Codespace
 
@@ -52,6 +54,4 @@ Then open the forwarded **port 8000** from the Codespace "Ports" tab.
 
 ## Tuning
 
-Everything lives in `static/js/config.js` — ball count, orb counts, blue-orb
-rarity, collision threshold, IQ bounds, ghost candidate count, boost strength
-and decay, etc.
+Everything lives in `static/js/config.js`.

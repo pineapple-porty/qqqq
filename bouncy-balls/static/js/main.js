@@ -1,43 +1,47 @@
 'use strict';
 
-// --- Bootstrap & main loop ------------------------------------------------
-
+// --- Bootstrap & main loop -------------------------------------------------
 (function main(){
-  const canvas = document.getElementById('stage');
-  canvas.style.cursor = 'grab';
-  renderer.init(canvas);
-
-  const state = {
-    balls: [],
-    pickups: initPickups(renderer.W, renderer.H),
-    stats: { green: 0, blue: 0, armor: 0, hits: 0 },
-  };
-  for (let i = 0; i < CONFIG.NUM_BALLS; i++){
-    state.balls.push(new Ball(i, renderer.W, renderer.H));
+  for (let i = 0; i < CONFIG.GREEN_BALLS; i++){
+    greenBalls.push({
+      element: makeElement('game-object health-ball'),
+      x: rand(0, innerWidth - 18), y: rand(0, innerHeight - 18),
+      vx: rand(-2, 2), vy: rand(-2, 2),
+      size: 18, width: 18, height: 18, radius: 9,
+    });
   }
+  initFlyers();
+  for (let i = 0; i < CONFIG.NUM_GUYS; i++) guys.push(new Ball(i));
+  initUI();
 
-  ui.init(canvas, state);
+  setInterval(spawnWall, CONFIG.WALL_INTERVAL_MS);
+  spawnBunker();
+  setInterval(spawnBunker, CONFIG.BUNKER_INTERVAL_MS);
 
   let last = performance.now();
   function loop(now){
     const dt = Math.min((now - last) / 1000, CONFIG.MAX_DT);
     last = now;
+    const elapsed = dt * 60;   // reference-style "frames"
 
-    for (const b of state.balls){
-      b.update(dt, renderer.W, renderer.H, state.pickups.orbs);
+    for (const guy of guys){
+      guy.update(elapsed, dt, now);
+      throwGrenade(guy, now);
+      collideGuyWithWalls(guy);
     }
-    moveOrbs(state.pickups, dt, renderer.W, renderer.H);
-    collideBalls(state.balls, state.stats, now);
-    collidePickups(state.balls, state.pickups, state.stats);
-    updatePickups(state.pickups, dt, renderer.W, renderer.H);
-
-    renderer.draw({
-      balls: state.balls,
-      pickups: state.pickups,
-      hovered: ui.hovered,
-      selected: ui.selected,
-    });
-    ui.refresh(state, false);
+    separateGuys(now);
+    collectGreenBalls(elapsed);
+    spawnArmorSquare(now);
+    collectArmorSquares();
+    spawnBlueBallsIfNeeded(now);
+    updateBunkers(now);
+    updateGrenades(now, elapsed);
+    updateMiniBullets(elapsed);
+    updateBounceBalls(elapsed);
+    moveFlyers(elapsed, now);
+    moveHazards(elapsed);
+    processWalls(now);
+    refreshMenu(false);
 
     requestAnimationFrame(loop);
   }
